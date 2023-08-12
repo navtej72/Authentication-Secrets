@@ -4,7 +4,8 @@ const express = require("express")
 const bodyParser = require("body-parser")
 const ejs = require("ejs")
 const mongoose = require("mongoose")
-const md5 = require("md5")
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 
@@ -38,9 +39,12 @@ app.get("/register", function(req, res){
 });
 
 app.post("/register", async function(req, res){
+
+  
+
   const newUser = new User({
     email: req.body.username,
-    password: md5(req.body.password)
+     password: await bcrypt.hash(req.body.password, 10)
   });
 
   try {
@@ -54,19 +58,35 @@ app.post("/register", async function(req, res){
 
 
 app.post("/login", async function(req, res) {
-  const username = req.body.username;
-  const password = md5(req.body.password);
+    const username = req.body.username;
+    const plaintextPassword = req.body.password;
 
-  try {
-    const foundUser = await User.findOne({ email: username });
-    
-    if (foundUser && foundUser.password === password) {
-      res.render("secrets");
+    try {
+        const foundUser = await User.findOne({ email: username });
+
+        if (foundUser) {
+            // Compare the entered plaintext password with the hashed password from the database
+            bcrypt.compare(plaintextPassword, foundUser.password, function(err, result) {
+                if (err) {
+                    console.log(err);
+                    // Handle the error appropriately
+                    return;
+                }
+
+                if (result) {
+                    res.render("secrets"); // Successful login
+                } else {
+                    res.redirect("/login"); // Redirect to login page if authentication fails
+                }
+            });
+        } else {
+            // User not found
+            res.redirect("/login"); // Redirect to login page
+        }
+    } catch (err) {
+        console.log(err);
+        // Handle the error appropriately
     }
-  } catch (err) {
-    console.log(err);
-    // Handle the error appropriately
-  }
 });
 
 
